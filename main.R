@@ -43,8 +43,10 @@ update_raw_data <- 1
 # first_ever_run <- 0
 # first_upload    <- 0
 # vintage <- "2023-07-03"
-# output_path     <- "/output/"
-# vintage_path     <- "/output/vintages/"
+output_path     <- "/data/"
+vintage_path     <- "/data/vintages/"
+raw_path     <- "/data/raw/"
+filtered_path <- "/data/filtered/"
 
 
 # Packages ----------------------------------------------------------------
