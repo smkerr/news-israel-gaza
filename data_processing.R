@@ -29,7 +29,7 @@ rm(list = ls())
 
 # Controls ----------------------------------------------------------------
 
-#.................................MANUALLY UPDATE WHEN COUNTRY IS ADDED OR REMOVED
+#.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
 media_list <- c("The Guardian (London)")
 col_date <-  c("date", "update_date")
 today <- Sys.Date()
