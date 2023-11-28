@@ -79,7 +79,7 @@ if (update_raw_data == 1) {
     i <- 1
     print(paste0("Updating latest data for ", cc, ", document ", i))
     while (TRUE) {
-      filepath <- paste0(wd, filtered_path, cc, "_", i, "_filtered.txt")
+      filepath <- paste0(wd, raw_path, cc, "_", i, ".txt")
       if (file.exists(filepath)) {
         tryCatch({
           articles_dt <- extract_articles(filepath, cc)
