@@ -1,0 +1,195 @@
+#===================================================================================================== 
+#
+#  >>>>>>>>>>>>>>>>  How has the Israel-Palestine conflict been covered in the media? >>>>>>>>>>>>>>>>>
+#
+#
+#           --------------Data Loading and processing---------------
+#
+# 
+#                  1) Some settings on the loading and processing of data
+#                  2) Retrieve latest newspaper level data from original sources
+#                  3) Load and process data into one corpus
+# 
+# 
+# 
+#
+# Author: Kai Foerster, MSc Data Science for Public Policy
+#
+# Version date:	  28/11/2023
+#=======================================================================================================
+
+
+# ===========================================================================
+#   1) Settings on the loading and processing of data
+# ===========================================================================
+
+
+# Housekeeping ------------------------------------------------------------
+rm(list = ls())
+
+# Controls ----------------------------------------------------------------
+
+#.................................MANUALLY UPDATE WHEN COUNTRY IS ADDED OR REMOVED
+media_list <- c("The Guardian (London)")
+col_date <-  c("date", "update_date")
+today <- Sys.Date()
+
+# Default settings and connections 
+update_raw_data <- 1
+update_vintage <- 0
+load_raw_data   <- 1
+first_ever_run <- 0
+vintage <- "2023-11-28"
+output_path     <- "/data/"
+vintage_path     <- "/data/vintages/"
+raw_path     <- "/data/raw/"
+filtered_path <- "/data/filtered/"
+
+
+# Packages ----------------------------------------------------------------
+
+# Packages to load
+pckg_to_load <- c("data.table", "lubridate") #this version also loads packages from the country files as these seemed to fail loading.
+
+# Load packages silently
+suppressPackageStartupMessages(
+  invisible(lapply(pckg_to_load, library, character.only = TRUE))
+)
+
+# Setting directories ----------------------------------------------------
+wd <- getwd() # "your path"
+setwd(wd)
+
+# Load functions
+source("wrangling_function.R")
+
+# ===========================================================================
+#   xx) DO WE NEED A SECTION TO CONVERT TFR FILES IN TXT HERE?
+# ===========================================================================
+
+
+# ===========================================================================
+#   2) Retrieve latest newspaper level data from original sources
+# ===========================================================================
+
+# Update data for selected newspapers ------
+
+if (update_raw_data == 1) {
+  for (cc in media_list) {
+    i <- 1
+    print(paste0("Updating latest data for ", cc, ", document ", i))
+    while (TRUE) {
+      filepath <- paste0(wd, filtered_path, cc, "_", i, "_filtered.txt")
+      if (file.exists(filepath)) {
+        tryCatch({
+          articles_dt <- extract_articles(filepath, cc)
+          csv_filepath <- paste0(wd, vintage_path, cc, "_", i, ".csv")
+          write.csv(articles_dt, csv_filepath, row.names = FALSE, na = "")
+        }, error = function(cond) {
+          message(paste0("Code seems to break"))
+          message("Here's the original error message:")
+          message(cond)
+        }, warning = function(cond) {
+          message(paste0("Code returned warning"))
+          message("Here's the original warning message:")
+          message(cond)
+        })
+        i <- i + 1
+      } else {
+        # If a file does not exist, break the loop and move to the next newspaper
+        break
+      }
+    }
+  }
+}
+
+remove(articles_dt)
+# ===========================================================================
+#   3) Load and process data into one corpus
+# ===========================================================================
+
+# Load new data -----------------------------------------------------------
+
+
+corpus_new <- data.table()
+
+#Load full corpus
+if (load_raw_data == 1) {
+  for (cc in media_list) {
+    i <- 1
+    while (TRUE) {
+      filepath <- paste0(wd, vintage_path, cc, "_", i, ".csv")
+      
+      if (!file.exists(filepath)) {
+        # Break the loop if the file does not exist
+        break
+      }
+      
+      print(paste0(cc, " document: ", i))
+      sub_corpus <- NULL
+      
+      # Import and remove redundant columns & rows
+      try({
+        sub_corpus <- as.data.table(read.csv(filepath))
+        sub_corpus$date <- mdy_hm(sub_corpus$date, tz = "GMT")
+        sub_corpus[, update_date := as.Date(today())]
+        
+        corpus_new <- rbind(corpus_new, sub_corpus)
+      }, silent = TRUE)
+      
+      i <- i + 1
+    }
+  }
+}
+
+remove(sub_corpus)
+# Load vintage data and update it with new data -----------------------------------------------------------
+
+if (first_ever_run == 1){
+  corpus <- corpus_new
+  corpus[, (col_date):=lapply(.SD, as.character), .SDcols=col_date]
+  write.csv(corpus, paste0(wd, vintage_path, "corpus_",today,".csv"), row.names = FALSE, na = "")
+  
+} else{
+  corpus <-  as.data.table(read.csv(paste0(wd, vintage_path, "corpus_",vintage,".csv")))
+  corpus$update_date <- as.Date(corpus$update_date)
+  corpus$date <- ymd_hms(corpus$date)
+  corpus_new <- corpus_new[!corpus, on = c("newspaper", "title")]
+  corpus <- rbind(corpus, corpus_new)
+  dup_rows <- corpus[duplicated(corpus[, c("newspaper", "title")]), ]
+  if(nrow(dup_rows)>0){
+    print("These are the duplicated rows")
+    print(dup_rows)
+    setkeyv(corpus, c("newspaper","title", "update_date")) # Convert your data.table to a keyed data.table based on "newspaper" and "title" and "update_date"
+    corpus <- corpus[!duplicated(corpus[,.(newspaper, title)], fromLast = TRUE)] # Remove duplicates and keep the latest updated value of rrep_hf
+    setkey(corpus, NULL) # Clear the key from the data.table
+    dup_rows <- corpus[duplicated(corpus[, c("newspaper", "title")]), ]
+    
+    if(nrow(dup_rows)>0){
+      print("There are still duplicated rows..These are the ones:")
+      print(dup_rows)
+      stop("Please check duplicated country date rows manually to find out which row to pick. Automatic updating failed.")
+    }
+    
+  } else{
+    remove(dup_rows)
+  }
+  print("These is the newly retrieved data that is appended to the vintage data")
+  print(corpus_new)
+  
+  if (update_vintage == 1){
+    corpus[, (col_date):=lapply(.SD, as.character), .SDcols=col_date]
+    write.csv(corpus, paste0(wd, vintage_path, "corpus_",today,".csv"), row.names = FALSE, na = "")
+  }
+}
+
+remove(corpus_new)
+remove(dup_rows)
+
+# Data transformations  -----------------------------------------------------------
+
+corpus <- corpus[order(newspaper, date),]
+corpus <- unique(corpus)
+write.csv(corpus, paste0(wd, output_path, "corpus",".csv"), row.names = FALSE, na = "")
+
+
