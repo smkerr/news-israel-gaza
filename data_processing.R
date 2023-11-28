@@ -39,7 +39,7 @@ update_raw_data <- 1
 update_vintage <- 0
 load_raw_data   <- 1
 first_ever_run <- 0
-vintage <- "2023-11-28"
+vintage <- "2023-11-29"
 output_path     <- "/data/"
 vintage_path     <- "/data/vintages/"
 raw_path     <- "/data/raw/"
