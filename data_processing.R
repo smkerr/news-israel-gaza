@@ -43,7 +43,6 @@ vintage <- "2023-11-29"
 output_path     <- "/data/"
 vintage_path     <- "/data/vintages/"
 raw_path     <- "/data/raw/"
-filtered_path <- "/data/filtered/"
 
 
 # Packages ----------------------------------------------------------------
@@ -161,7 +160,7 @@ if (first_ever_run == 1){
     print("These are the duplicated rows")
     print(dup_rows)
     setkeyv(corpus, c("newspaper","title", "update_date")) # Convert your data.table to a keyed data.table based on "newspaper" and "title" and "update_date"
-    corpus <- corpus[!duplicated(corpus[,.(newspaper, title)], fromLast = TRUE)] # Remove duplicates and keep the latest updated value of rrep_hf
+    corpus <- corpus[!duplicated(corpus[,.(newspaper, title)], fromLast = TRUE)] # Remove duplicates and keep the latest updated document
     setkey(corpus, NULL) # Clear the key from the data.table
     dup_rows <- corpus[duplicated(corpus[, c("newspaper", "title")]), ]
     
