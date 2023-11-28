@@ -30,7 +30,7 @@ rm(list = ls())
 # Controls ----------------------------------------------------------------
 
 #.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
-media_list <- c("The Guardian (London)")
+media_list <- c("The Guardian (London)", "Al Jazeera English", "The Strait Times (Singapore)", "The Times of India (TOI)")
 col_date <-  c("date", "update_date")
 today <- Sys.Date()
 
@@ -39,7 +39,7 @@ update_raw_data <- 1
 update_vintage <- 0
 load_raw_data   <- 1
 first_ever_run <- 0
-vintage <- "2023-11-29"
+vintage <- lubridate::today()
 output_path     <- "/data/"
 vintage_path     <- "/data/vintages/"
 raw_path     <- "/data/raw/"
