@@ -30,8 +30,8 @@ rm(list = ls())
 # Controls ----------------------------------------------------------------
 
 #.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
-#media_list <- c("The Guardian (London)", "Al Jazeera English", "The Strait Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times")
-#media_list2 <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT")
+#media_list <- c("The Guardian (London)", "Al Jazeera English", "The Straits Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times", "Die Welt (English))
+#media_list2 <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT" "DWE")
 media_list <- c("Al Jazeera English")
 
 col_date <-  c("date", "update_date")
