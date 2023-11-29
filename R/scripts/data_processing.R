@@ -214,3 +214,56 @@ corpus <- unique(corpus)
 write.csv(corpus, paste0(wd, output_path, "corpus",".csv"), row.names = FALSE, na = "")
 
 
+# Converting articles to sentences -----------------------------------------------------------
+
+filtered_df <- subset(corpus, length < 3000) # To avoid the really long articles I am capping these at 3000 characters but we can think of a better way to control for this
+
+# now adding a coloumn called 'sentences' extracting each sentence from an article body and saving the resulting data in new_df
+
+n_rows <- nrow(filtered_df)
+new_rows <- list()
+
+for (i in 1:n_rows) {
+  tryCatch({
+    # Tokenize the text into sentences
+    sentences <- unlist(tokenize_sentences(filtered_df$body[i]))
+    
+    # Remove '\n' and split into sentences
+    sentences <- unlist(strsplit(gsub("\\\\n", "", filtered_df$body[i]), "\\.\\s*"))
+    
+    # Remove sentences containing "End of Document"
+    sentences <- sentences[!grepl("End of Document", sentences)]
+    
+    # Create new rows for each sentence
+    for (sentence in sentences) {
+      # Create a new row with the same values as the original row
+      new_row <- filtered_df[i, ]
+      # Assign the current sentence to the 'sentence' column
+      new_row$sentence <- sentence
+      # Append the new row to the list
+      new_rows <- append(new_rows, list(new_row))
+    }
+  }, error = function(e) {
+    # If an error occurs, create a row with NA for sentence
+    new_row <- filtered_df[i, ]
+    new_row$sentence <- NA
+    new_rows <- append(new_rows, list(new_row))
+  }, warning = function(w) {
+    # If a warning occurs, create a row with NA for sentence
+    new_row <- filtered_df[i, ]
+    new_row$sentence <- NA
+    new_rows <- append(new_rows, list(new_row))
+  })
+}
+
+# Combine the new rows into a dataframe
+new_df <- do.call(rbind, new_rows)
+
+
+# Converting sentences to words -----------------------------------------------------------
+
+# Adding another dimension of words by tokenizing the sentences
+
+new_df_word <- new_df %>%
+  mutate(text = sentence) %>%
+  unnest_tokens(word, text, token = "words")
