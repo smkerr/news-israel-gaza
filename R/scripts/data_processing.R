@@ -32,7 +32,7 @@ rm(list = ls())
 #.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
 #media_list <- c("The Guardian (London)", "Al Jazeera English", "The Straits Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times", "Die Welt (English))
 #media_list2 <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT" "DWE")
-media_list <- c("Al Jazeera English")
+media_list <- c("The Guardian (London)")
 
 col_date <-  c("date", "update_date")
 today <- Sys.Date()
@@ -103,7 +103,7 @@ if (update_raw_data == 1) {
       filepath <- paste0(wd, raw_path, cc, "_", i, ".txt")
       if (file.exists(filepath)) {
         tryCatch({
-          articles_dt <- extract_articles_AJE(filepath, cc)
+          articles_dt <- extract_articles_TGD(filepath, cc)
           csv_filepath <- paste0(wd, vintage_path, cc, "_", i, ".csv")
           write.csv(articles_dt, csv_filepath, row.names = FALSE, na = "")
         }, error = function(cond) {
