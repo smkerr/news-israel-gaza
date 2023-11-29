@@ -65,7 +65,7 @@ wd <- getwd() # "your path"
 setwd(wd)
 
 # Load functions
-source("wrangling_function.R")
+source("R/funcs/wrangling_function.R")
 
 # ===========================================================================
 #   1) Convert RTF to TXT files
