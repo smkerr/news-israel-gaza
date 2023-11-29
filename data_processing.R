@@ -30,7 +30,10 @@ rm(list = ls())
 # Controls ----------------------------------------------------------------
 
 #.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
-media_list <- c("The Guardian (London)", "Al Jazeera English", "The Strait Times (Singapore)", "The Times of India (TOI)")
+#media_list <- c("The Guardian (London)", "Al Jazeera English", "The Strait Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times")
+#media_list2 <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT")
+media_list <- c("Al Jazeera English")
+
 col_date <-  c("date", "update_date")
 today <- Sys.Date()
 
@@ -39,7 +42,9 @@ update_raw_data <- 1
 update_vintage <- 0
 load_raw_data   <- 1
 first_ever_run <- 0
-vintage <- lubridate::today()
+convert_rtf <- 0
+#vintage <- lubridate::today()
+vintage <- "2023-11-28"
 output_path     <- "/data/"
 vintage_path     <- "/data/vintages/"
 raw_path     <- "/data/raw/"
@@ -48,7 +53,7 @@ raw_path     <- "/data/raw/"
 # Packages ----------------------------------------------------------------
 
 # Packages to load
-pckg_to_load <- c("data.table", "here", "lubridate", "stringr", "striprtf",) #this version also loads packages from the country files as these seemed to fail loading.
+pckg_to_load <- c("data.table", "here", "lubridate", "stringr", "striprtf") #this version also loads packages from the country files as these seemed to fail loading.
 
 # Load packages silently
 suppressPackageStartupMessages(
@@ -65,7 +70,7 @@ source("wrangling_function.R")
 # ===========================================================================
 #   1) Convert RTF to TXT files
 # ===========================================================================
-
+if (convert_rtf == 1) {
 # define file names
 files_in <- list.files(path = here("data/rtf")) # RTF files (input)
 files_out <- str_replace(files_in, "RTF", "txt") # TXT files (output)
@@ -83,7 +88,7 @@ for (i in seq_along(files_in)) {
   writeLines(temp_txt, here("data/raw", str_replace(files_out[i], "RTF", "txt")))
   
 }
-
+}
 # ===========================================================================
 #   2) Retrieve latest newspaper level data from original sources
 # ===========================================================================
@@ -98,7 +103,7 @@ if (update_raw_data == 1) {
       filepath <- paste0(wd, raw_path, cc, "_", i, ".txt")
       if (file.exists(filepath)) {
         tryCatch({
-          articles_dt <- extract_articles(filepath, cc)
+          articles_dt <- extract_articles_AJE(filepath, cc)
           csv_filepath <- paste0(wd, vintage_path, cc, "_", i, ".csv")
           write.csv(articles_dt, csv_filepath, row.names = FALSE, na = "")
         }, error = function(cond) {
