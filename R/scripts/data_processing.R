@@ -98,9 +98,9 @@ for (i in seq_along(files_in)) {
 if (update_raw_data == 1) {
   for (cc in media_list) {
     i <- 1
-    print(paste0("Updating latest data for ", cc, ", document ", i))
     while (TRUE) {
       filepath <- paste0(wd, raw_path, cc, "_", i, ".txt")
+      print(paste0("Updating latest data for ", cc, ", document ", i))
       if (file.exists(filepath)) {
         tryCatch({
           articles_dt <- extract_articles_TGD(filepath, cc)
@@ -211,6 +211,9 @@ remove(dup_rows)
 
 corpus <- corpus[order(newspaper, date),]
 corpus <- unique(corpus)
+
+
+
 write.csv(corpus, paste0(wd, output_path, "corpus",".csv"), row.names = FALSE, na = "")
 
 
