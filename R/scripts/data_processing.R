@@ -32,7 +32,10 @@ rm(list = ls())
 #.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
 #media_list <- c("The Guardian (London)", "Al Jazeera English", "The Straits Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times", "Die Welt (English))
 #media_list2 <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT" "DWE")
-media_list <- c("The Guardian (London)")
+media_list <- c("The Guardian (London)", "South China Morning Post")
+media_abbrv<- c("TGD", "SCM")
+media_dict <- setNames(media_abbrv, media_list) # Create a dictionary mapping media names to abbreviations
+
 
 col_date <-  c("date", "update_date")
 today <- Sys.Date()
@@ -43,8 +46,9 @@ update_vintage <- 0
 load_raw_data   <- 1
 first_ever_run <- 0
 convert_rtf <- 0
+tokenise_operation <-0 
 #vintage <- lubridate::today()
-vintage <- "2023-11-28"
+vintage <- "2023-11-29"
 output_path     <- "/data/"
 vintage_path     <- "/data/vintages/"
 raw_path     <- "/data/raw/"
@@ -103,7 +107,7 @@ if (update_raw_data == 1) {
       print(paste0("Updating latest data for ", cc, ", document ", i))
       if (file.exists(filepath)) {
         tryCatch({
-          articles_dt <- extract_articles_TGD(filepath, cc)
+          articles_dt <- get(paste0("extract_articles_", media_dict[cc]))(filepath, cc)
           csv_filepath <- paste0(wd, vintage_path, cc, "_", i, ".csv")
           write.csv(articles_dt, csv_filepath, row.names = FALSE, na = "")
         }, error = function(cond) {
@@ -152,7 +156,7 @@ if (load_raw_data == 1) {
       # Import and remove redundant columns & rows
       try({
         sub_corpus <- as.data.table(read.csv(filepath))
-        sub_corpus$date <- mdy_hm(sub_corpus$date, tz = "GMT")
+        sub_corpus$date <- as.Date(sub_corpus$date)
         sub_corpus[, update_date := as.Date(today())]
         
         corpus_new <- rbind(corpus_new, sub_corpus)
@@ -166,6 +170,7 @@ if (load_raw_data == 1) {
 remove(sub_corpus)
 # Load vintage data and update it with new data -----------------------------------------------------------
 
+
 if (first_ever_run == 1){
   corpus <- corpus_new
   corpus[, (col_date):=lapply(.SD, as.character), .SDcols=col_date]
@@ -174,17 +179,17 @@ if (first_ever_run == 1){
 } else{
   corpus <-  as.data.table(read.csv(paste0(wd, vintage_path, "corpus_",vintage,".csv")))
   corpus$update_date <- as.Date(corpus$update_date)
-  corpus$date <- ymd_hms(corpus$date)
-  corpus_new <- corpus_new[!corpus, on = c("newspaper", "title")]
+  corpus$date <- as.Date(corpus$date)
+  corpus_new <- corpus_new[!corpus, on = c("newspaper", "body")]
   corpus <- rbind(corpus, corpus_new)
-  dup_rows <- corpus[duplicated(corpus[, c("newspaper", "title")]), ]
+  dup_rows <- corpus[duplicated(corpus[, c("newspaper", "body")]), ]
   if(nrow(dup_rows)>0){
     print("These are the duplicated rows")
     print(dup_rows)
-    setkeyv(corpus, c("newspaper","title", "update_date")) # Convert your data.table to a keyed data.table based on "newspaper" and "title" and "update_date"
+    setkeyv(corpus, c("newspaper","body", "update_date")) # Convert your data.table to a keyed data.table based on "newspaper" and "title" and "update_date"
     corpus <- corpus[!duplicated(corpus[,.(newspaper, title)], fromLast = TRUE)] # Remove duplicates and keep the latest updated document
     setkey(corpus, NULL) # Clear the key from the data.table
-    dup_rows <- corpus[duplicated(corpus[, c("newspaper", "title")]), ]
+    dup_rows <- corpus[duplicated(corpus[, c("newspaper", "body")]), ]
     
     if(nrow(dup_rows)>0){
       print("There are still duplicated rows..These are the ones:")
@@ -213,11 +218,12 @@ corpus <- corpus[order(newspaper, date),]
 corpus <- unique(corpus)
 
 
-
 write.csv(corpus, paste0(wd, output_path, "corpus",".csv"), row.names = FALSE, na = "")
 
 
 # Converting articles to sentences -----------------------------------------------------------
+
+if (tokenise_operation == 1){
 
 filtered_df <- subset(corpus, length < 3000) # To avoid the really long articles I am capping these at 3000 characters but we can think of a better way to control for this
 
@@ -270,3 +276,4 @@ new_df <- do.call(rbind, new_rows)
 new_df_word <- new_df %>%
   mutate(text = sentence) %>%
   unnest_tokens(word, text, token = "words")
+}
