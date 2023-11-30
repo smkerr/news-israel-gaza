@@ -1,0 +1,87 @@
+---
+title: "Processing 2 words"
+output: html_document
+date: "2023-11-29"
+---
+
+
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(tidytext)
+library(stringr)
+```
+
+
+```{r}
+# Update any data set here call it df
+df <- read_csv("text-as-data_final/data/vintages/corpus_2023-11-29.csv")
+
+filtered_df <- subset(df, length < 3000)
+
+```
+
+
+
+```{r}
+
+
+n_rows <- nrow(filtered_df)
+new_rows <- list()
+
+for (i in 1:n_rows) {
+  tryCatch({
+    # Tokenize the text into sentences
+    sentences <- unlist(str_split(filtered_df$body[i], "\\."))
+
+    # Remove '\n' and trim sentences
+    sentences <- str_replace_all(sentences, "\\\\n", "")
+    sentences <- str_trim(sentences)
+
+    # Remove sentences containing "End of Document"
+    sentences <- sentences[!str_detect(sentences, "End of Document")]
+
+    # Create new rows for each sentence
+    for (sentence in sentences) {
+      # Create a new row with the same values as the original row
+      new_row <- filtered_df[i, ]
+      # Assign the current sentence to the 'sentence' column
+      new_row$sentence <- sentence
+      # Append the new row to the list
+      new_rows <- append(new_rows, list(new_row))
+    }
+  }, error = function(e) {
+    # If an error occurs, create a row with NA for sentence
+    new_row <- filtered_df[i, ]
+    new_row$sentence <- NA
+    new_rows <- append(new_rows, list(new_row))
+  }, warning = function(w) {
+    # If a warning occurs, create a row with NA for sentence
+    new_row <- filtered_df[i, ]
+    new_row$sentence <- NA
+    new_rows <- append(new_rows, list(new_row))
+  })
+}
+
+# Combine the new rows into a dataframe
+new_df <- do.call(rbind, new_rows)
+
+```
+
+
+
+```{r}
+
+new_df_word <- new_df %>%
+  mutate(text = sentence) %>%
+  unnest_tokens(word, text, token = "words")
+
+```
+
+
+
+
+
+
