@@ -32,8 +32,8 @@ rm(list = ls())
 #.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
 #media_list <- c("The Guardian (London)", "Al Jazeera English", "The Straits Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times", "Die Welt (English))
 #media_list2 <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT" "DWE")
-media_list <- c("The Guardian (London)", "South China Morning Post")
-media_abbrv<- c("TGD", "SCM")
+media_list <- c("The Guardian (London)", "Al Jazeera English", "South China Morning Post")
+media_abbrv<- c("TGD","ALJ","SCM")
 media_dict <- setNames(media_abbrv, media_list) # Create a dictionary mapping media names to abbreviations
 
 
@@ -42,13 +42,12 @@ today <- Sys.Date()
 
 # Default settings and connections 
 update_raw_data <- 1
-update_vintage <- 0
+update_vintage <- 1
 load_raw_data   <- 1
 first_ever_run <- 0
 convert_rtf <- 0
 tokenise_operation <-0 
-#vintage <- lubridate::today()
-vintage <- "2023-11-29"
+vintage <- "2023-11-30"
 output_path     <- "/data/"
 vintage_path     <- "/data/vintages/"
 raw_path     <- "/data/raw/"

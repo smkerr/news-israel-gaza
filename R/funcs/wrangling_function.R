@@ -49,53 +49,66 @@ extract_articles_TGD <- function(filepath, newspaper_name) {
 }
 
 
-extract_articles_AJE <- function(filepath, newspaper_name) {
+extract_articles_ALJ <- function(filepath, newspaper_name) {
   lines <- readLines(filepath, warn = FALSE)
   articles <- list()
   current_article <- list()
-  capture_next_line_as_length <- FALSE
+  capture_next_line_as_date <- FALSE
   reading_body <- FALSE
-  title_line <- FALSE
+  exclude_next_line <- FALSE  # Flag to exclude lines under "Notes"
+  first_line_in_body <- TRUE  # Flag to skip the first line in the body
   
   for (line in lines) {
     if (line == "") {
       next
-    } else if (grepl(newspaper_name, line) && title_line) {
-      # Start of a new article
+    } else if (startsWith(line, "Notes")) {
+      # Skip the "Notes" section in Al Jazeera articles and set the flag to exclude lines
+      exclude_next_line <- TRUE
+    } else if (startsWith(line, "Newstex Blogs")) {
+      # Ignore "Newstex Blogs" line in Al Jazeera articles
+      next
+    } else if (startsWith(line, "Link to the original story.")) {
+      # Ignore "Newstex Blogs" line in Al Jazeera articles
+      next  
+    } else if (startsWith(line, "Al Jazeera English")) {
+      # Start of a new Al Jazeera article
       if (length(current_article) > 0) {
         articles[[length(articles) + 1]] <- current_article
       }
-      current_article <- list(title = prev_line, newspaper = line, date = "", length = NA, body = "", load_date = "")
-      capture_next_line_as_length <- TRUE
+      current_article <- list(title = prev_line, newspaper = line, date = "", section = "", length = NA, byline = "", highlight = "", body = "", load_date = "")
+      capture_next_line_as_date <- TRUE
       reading_body <- FALSE
-      title_line <- FALSE
-    } else if (grepl("Newstex Blogs", line)) {
-      title_line <- TRUE
-    } else if (capture_next_line_as_length && grepl("^Length:", line)) {
+      first_line_in_body <- TRUE  # Reset the flag when starting a new article
+    } else if (capture_next_line_as_date) {
+      # Parse Al Jazeera date format
+      current_article$date <- as.Date(mdy_hm(line, tz = "EST"))
+      capture_next_line_as_date <- FALSE
+    } else if (grepl("^Length:", line)) {
       current_article$length <- as.numeric(gsub("\\D", "", line))
-      capture_next_line_as_length <- FALSE
-    } else if (capture_next_line_as_length) {
-      current_article$date <- prev_line
-      capture_next_line_as_length <- FALSE
+    } else if (grepl("^Byline:", line)) {
+      current_article$byline <- sub("Byline:\\s*", "", line)
     } else if (line == "Body") {
       reading_body <- TRUE
+      exclude_next_line <- FALSE  # Reset the flag when entering the body
     } else if (grepl("^Load-Date:", line)) {
       current_article$load_date <- sub("Load-Date:\\s*", "", line)
-    } else if (reading_body) {
-      if (grepl("^Link to the original story", line)) {
-        reading_body <- FALSE
+    } else if (reading_body && !exclude_next_line) {
+      if (first_line_in_body) {
+        first_line_in_body <- FALSE
+        next  # Skip the first line in the body
       } else {
         current_article$body <- paste(current_article$body, line, sep = "\\n")
       }
     }
     prev_line <- line
   }
+  
   # Add the last article if exists
   if (length(current_article) > 0) {
     articles[[length(articles) + 1]] <- current_article
   }
   
-  # Convert list of articles to data.table
+  # Convert list of Al Jazeera articles to data.table
   dt <- rbindlist(lapply(articles, as.data.table), fill = TRUE)
   return(dt)
 }
