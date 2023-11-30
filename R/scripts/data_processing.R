@@ -18,6 +18,10 @@
 # Version date:	  28/11/2023
 #=======================================================================================================
 
+##### TO DO
+# convert words into characters in length for SCM and TST
+# Add NYT, TOI, WELT
+
 
 # ===========================================================================
 #   1) Settings on the loading and processing of data
@@ -48,8 +52,8 @@ update_vintage <- 0
 load_raw_data   <- 1
 first_ever_run <- 0
 convert_rtf <- 0
-tokenise_operation <-0 
-vintage <- "2023-11-30"
+tokenise_operation <-1 
+vintage <- "2023-11-29"
 output_path     <- "/data/"
 vintage_path     <- "/data/vintages/"
 raw_path     <- "/data/raw/"
@@ -58,7 +62,7 @@ raw_path     <- "/data/raw/"
 # Packages ----------------------------------------------------------------
 
 # Packages to load
-pckg_to_load <- c("data.table", "here", "lubridate", "stringr", "striprtf") #this version also loads packages from the country files as these seemed to fail loading.
+pckg_to_load <- c("data.table", "here", "lubridate", "stringr", "striprtf", "tokenizers", "tidytext") #this version also loads packages from the country files as these seemed to fail loading.
 
 # Load packages silently
 suppressPackageStartupMessages(
@@ -159,6 +163,7 @@ if (load_raw_data == 1) {
         sub_corpus <- as.data.table(read.csv(filepath))
         sub_corpus$date <- as.Date(sub_corpus$date)
         sub_corpus[, update_date := as.Date(today())]
+        sub_corpus$length <- as.numeric(sub_corpus$length)
         
         corpus_new <- rbind(corpus_new, sub_corpus)
       }, silent = TRUE)
@@ -181,6 +186,7 @@ if (first_ever_run == 1){
   corpus <-  as.data.table(read.csv(paste0(wd, vintage_path, "corpus_",vintage,".csv")))
   corpus$update_date <- as.Date(corpus$update_date)
   corpus$date <- as.Date(corpus$date)
+  corpus$length <- as.numeric(corpus$length)
   corpus_new <- corpus_new[!corpus, on = c("newspaper", "body")]
   corpus <- rbind(corpus, corpus_new)
   dup_rows <- corpus[duplicated(corpus[, c("newspaper", "body")]), ]
@@ -267,14 +273,7 @@ for (i in 1:n_rows) {
 }
 
 # Combine the new rows into a dataframe
-new_df <- do.call(rbind, new_rows)
+corpus_sent <- do.call(rbind, new_rows)
+write.csv(corpus_sent, paste0(wd, output_path, "corpus_sent",".csv"), row.names = FALSE, na = "")
 
-
-# Converting sentences to words -----------------------------------------------------------
-
-# Adding another dimension of words by tokenizing the sentences
-
-new_df_word <- new_df %>%
-  mutate(text = sentence) %>%
-  unnest_tokens(word, text, token = "words")
 }

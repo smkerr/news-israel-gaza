@@ -139,7 +139,8 @@ extract_articles_SCM <- function(filepath, newspaper_name) {
     } else if (grepl("^Section:", line)) {
       current_article$section <- sub("Section:\\s*", "", line)
     } else if (grepl("^Length:", line)) {
-      current_article$length <- paste0(as.numeric(gsub("\\D", "", line)), " words")
+      #current_article$length <- paste0(as.numeric(gsub("\\D", "", line)), " words")
+      current_article$length <- as.numeric(gsub("\\D", "", line))
     } else if (grepl("^Byline:", line)) {
       current_article$byline <- sub("Byline:\\s*", "", line)
     } else if (grepl("^Highlight:", line)) {
@@ -187,7 +188,8 @@ extract_articles_TST <- function(filepath, newspaper_name) {
     } else if (grepl("^Section:", line)) {
       current_article$section <- sub("Section:\\s*", "", line)
     } else if (grepl("^Length:", line)) {
-      current_article$length <- paste0(as.numeric(gsub("\\D", "", line)), " words")
+      #current_article$length <- paste0(as.numeric(gsub("\\D", "", line)), " words")
+      current_article$length <- as.numeric(gsub("\\D", "", line))
     } else if (grepl("^Byline:", line)) {
       current_article$highlight <- sub("Byline:\\s*", "", line)
     } else if (line == "Body") {
