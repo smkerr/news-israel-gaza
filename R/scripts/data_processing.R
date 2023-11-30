@@ -32,8 +32,10 @@ rm(list = ls())
 #.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
 #media_list <- c("The Guardian (London)", "Al Jazeera English", "The Straits Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times", "Die Welt (English))
 #media_list2 <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT" "DWE")
-media_list <- c("The Guardian (London)", "Al Jazeera English", "South China Morning Post")
-media_abbrv<- c("TGD","ALJ","SCM")
+media_list <- c("The Guardian (London)", "Al Jazeera English", "South China Morning Post", "The Straits Times (Singapore)")
+media_abbrv<- c("TGD","ALJ","SCM", "TST")
+#media_list <- c("The Straits Times (Singapore)")
+#media_abbrv<- c("TST")
 media_dict <- setNames(media_abbrv, media_list) # Create a dictionary mapping media names to abbreviations
 
 
@@ -42,7 +44,7 @@ today <- Sys.Date()
 
 # Default settings and connections 
 update_raw_data <- 1
-update_vintage <- 1
+update_vintage <- 0
 load_raw_data   <- 1
 first_ever_run <- 0
 convert_rtf <- 0
@@ -186,7 +188,7 @@ if (first_ever_run == 1){
     print("These are the duplicated rows")
     print(dup_rows)
     setkeyv(corpus, c("newspaper","body", "update_date")) # Convert your data.table to a keyed data.table based on "newspaper" and "title" and "update_date"
-    corpus <- corpus[!duplicated(corpus[,.(newspaper, title)], fromLast = TRUE)] # Remove duplicates and keep the latest updated document
+    corpus <- corpus[!duplicated(corpus[,.(newspaper, body)], fromLast = TRUE)] # Remove duplicates and keep the latest updated document
     setkey(corpus, NULL) # Clear the key from the data.table
     dup_rows <- corpus[duplicated(corpus[, c("newspaper", "body")]), ]
     
