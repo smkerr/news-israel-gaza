@@ -19,8 +19,8 @@
 #=======================================================================================================
 
 ##### TO DO
-# convert words into characters in length for SCM and TST
-# Add NYT, TOI, WELT
+# convert words into characters in length for SCM and TST?
+# filter articles by block-time updated-timeUpdated
 
 
 # ===========================================================================
@@ -34,26 +34,26 @@ rm(list = ls())
 # Controls ----------------------------------------------------------------
 
 #.................................MANUALLY UPDATE WHEN NEWPAPER IS ADDED OR REMOVED
-#media_list <- c("The Guardian (London)", "Al Jazeera English", "The Straits Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times", "Die Welt (English))
-#media_list2 <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT" "DWE")
-media_list <- c("The Guardian (London)", "Al Jazeera English", "South China Morning Post", "The Straits Times (Singapore)")
-media_abbrv<- c("TGD","ALJ","SCM", "TST")
-#media_list <- c("The Straits Times (Singapore)")
-#media_abbrv<- c("TST")
+#media_list <- c("The Guardian (London)", "Al Jazeera English", "The Straits Times (Singapore)", "The Times of India (TOI)", "South China Morning Post", "The New York Times", "Die Welt (English)")
+#media_abbrv <- c("TGD", "ALJ", "TST", "TOI", "SCM", "NYT", "DWE")
+
+media_list <- c("The New York Times")
+media_abbrv <- c("NYT")
+
 media_dict <- setNames(media_abbrv, media_list) # Create a dictionary mapping media names to abbreviations
 
 
 col_date <-  c("date", "update_date")
-today <- Sys.Date()
+today <- Sys.Date()+1
 
 # Default settings and connections 
 update_raw_data <- 1
-update_vintage <- 0
+update_vintage <- 1
 load_raw_data   <- 1
 first_ever_run <- 0
 convert_rtf <- 0
-tokenise_operation <-1 
-vintage <- "2023-11-29"
+tokenise_operation <-1
+vintage <- "2023-11-30"
 output_path     <- "/data/"
 vintage_path     <- "/data/vintages/"
 raw_path     <- "/data/raw/"
@@ -164,6 +164,7 @@ if (load_raw_data == 1) {
         sub_corpus$date <- as.Date(sub_corpus$date)
         sub_corpus[, update_date := as.Date(today())]
         sub_corpus$length <- as.numeric(sub_corpus$length)
+        sub_corpus$newspaper <- as.character(trimws(sub_corpus$newspaper))
         
         corpus_new <- rbind(corpus_new, sub_corpus)
       }, silent = TRUE)
@@ -234,6 +235,14 @@ if (tokenise_operation == 1){
 
 filtered_df <- subset(corpus, length < 3000) # To avoid the really long articles I am capping these at 3000 characters but we can think of a better way to control for this
 
+if (update_vintage == 1){
+  filtered_df[, (col_date):=lapply(.SD, as.character), .SDcols=col_date]
+  write.csv(filtered_df, paste0(wd, vintage_path, "corpus_filtered_",today,".csv"), row.names = FALSE, na = "")
+}
+
+
+#Save filtered corpus
+write.csv(filtered_df, paste0(wd, output_path, "corpus_filtered",".csv"), row.names = FALSE, na = "")
 # now adding a coloumn called 'sentences' extracting each sentence from an article body and saving the resulting data in new_df
 
 n_rows <- nrow(filtered_df)
@@ -275,5 +284,10 @@ for (i in 1:n_rows) {
 # Combine the new rows into a dataframe
 corpus_sent <- do.call(rbind, new_rows)
 write.csv(corpus_sent, paste0(wd, output_path, "corpus_sent",".csv"), row.names = FALSE, na = "")
+
+if (update_vintage == 1){
+  corpus_sent[, (col_date):=lapply(.SD, as.character), .SDcols=col_date]
+  write.csv(corpus_sent, paste0(wd, vintage_path, "corpus_sent_",today,".csv"), row.names = FALSE, na = "")
+}
 
 }
