@@ -6,5 +6,5 @@
 **/.DS_Store
 *.RTF
 *.txt
-data/vintages/*
-**/corpus.csv
+*.rds
+*.csv
