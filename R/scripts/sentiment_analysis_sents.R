@@ -4,6 +4,7 @@
 pacman::p_load(
   dplyr,
   ggplot2,
+  here,
   lubridate,
   quanteda, 
   readr,
@@ -22,7 +23,7 @@ corpus_tidy <- corpus |>
   mutate(
     sentence = str_trim(sentence),
     sentence = str_remove_all(sentence, "\\\\n"), # remove line breaks: "\\n"
-    sentence = str_remove_all(sentence, "\\\""),
+    sentence = str_remove_all(sentence, "\\\"")
     #sentence = str_conv(sentence, "ASCII"),# remove accent marks to ensure comparability
     #sentence = str_remove_all(sentence, "�") # remove unknown characters 
   ) |> 
@@ -68,28 +69,37 @@ corpus_tidy <- corpus |>
     sentence != "-C",
     sentence != "(A full transcript of the episode is available",
     date >= as_date("2023-09-07"), # articles from up to 1 month before Oct 7
-    date <= as_date("2023-11-07") # articles from up to 1 month after Oct 7
+    date <= as_date("2023-11-07"), # articles from up to 1 month after Oct 7
   ) |> 
   group_by(sentence) |> 
-  filter(n() == 1) |> 
+  filter(n() == 1) |> # remove duplicates
   ungroup() |> 
-  select(newspaper, date, sentence) |> 
   mutate(sentence = str_to_lower(sentence)) |> 
+  select(newspaper, date, sentence) |> 
   arrange(date)
 
 # assign Palestine/Gaza or Israel label
 corpus_labeled <- corpus_tidy |> 
   mutate(
     label = case_when(
-      !str_detect(sentence, "palest\\w+|gaza\\w+|israel\\w+") ~ NA, # "both", # NA if no mention of Palestine (+Gaza) or Israel
-      str_detect(sentence, "palest\\w+|gaza\\w+") &
-        str_detect(sentence, "israel\\w+") ~ NA_character_, # NA if both are mentioned
-      str_detect(sentence, "palest\\w+|gaza\\w+") ~ "palestine/gaza",
-      str_detect(sentence, "israel\\w+") ~ "israel",
+      !str_detect(sentence, "palest\\w+|gaza\\w*|israel\\w*|hamas|hammas") ~ NA, # NA if no mention of Palestine/Gaza, Israel, or Hamas
+      str_detect(sentence, "palest\\w+|gaza\\w*") & str_detect(sentence, "hamas|hammas") |
+        str_detect(sentence, "palest\\w+|gaza\\w*") & str_detect(sentence, "israel\\w+") |
+        str_detect(sentence, "hamas|hammas") & str_detect(sentence, "israel\\w+") ~ NA_character_, # NA if two are mentioned together
+      str_detect(sentence, "palest\\w+|gaza\\w*") ~ "palestine/gaza",
+      str_detect(sentence, "israel\\w*") ~ "israel",
+      str_detect(sentence, "hamas|hammas") ~ "hamas",
       TRUE ~ NA
     )
   ) |> 
   filter(!is.na(label))
+
+# inspect labels
+corpus_labeled |> 
+  count(label, sort = TRUE)
+corpus_labeled |> 
+  janitor::tabyl(newspaper, label) |> 
+  janitor::adorn_totals()
 
 # Create Document Feature Matrix -----------------------------------------------
 # create dfm
@@ -104,247 +114,249 @@ dfmat <- corpus_labeled |>
 # inspect metadata 
 docvars(dfmat) |> head()
 
-# Sentiment analysis by media outlet -------------------------------------------
+# Prepare data for sentiment analysis ------------------------------------------
 # start time 
 tictoc::tic()
 
 # calculate valence of sentences
 sentiments <- vader_df(corpus_labeled$sentence)
 
-# combine sentence with valence scores
+# end time 
+tictoc::toc()
+
+# combine sentences, sentiment scores, and metadata
 sent_sentiment <- cbind(
   text = corpus_labeled$sentence, # text
-  sentiments |> select(-text, -word_scores) # metadata
+  sentiments |> select(-text, -word_scores), # sentiment scores
+  newspaper = corpus_labeled$newspaper, # media oulet
+  date = as_date(corpus_labeled$date), # date 
+  label = corpus_labeled$label # label (e.g., palestine/gaza, israel)
 )
 
-# most positive
-pos <- sent_sentiment |> 
-  arrange(desc(compound)) |> 
-  head()
+# Write function to find the most positive sentences ---------------------------
+most_pos_sent <- function(df, type = "all") {
+  
+  # check inputs
+  if (!type %in% c("all", "palestine/gaza", "israel", "hamas")) return("Invalid type. Please choose from 'all', 'palestine/gaza', 'israel', 'hamas'")
+  
+  # filter by type, if needed
+  if (type != "all") {
+    df <- df |> 
+      filter(label == type)
+  }
+  
+  # most positive
+  pos <- df |> 
+    arrange(desc(compound)) |> 
+    head()
+  
+  return(pos)
 
-for (i in rownames(pos)) {
-  print(pos[i, "text"])
-  print(pos[i, "compound"])
+} 
+
+# Write function to find the most negative sentences ---------------------------
+most_neg_sent <- function(df, type = "all") {
+  
+  # check inputs
+  if (!type %in% c("all", "palestine/gaza", "israel", "hamas")) return("Invalid type. Please choose from 'all', 'palestine/gaza', 'israel', 'hamas'")
+  
+  # filter by type, if needed
+  if (type != "all") {
+    df <- df |> 
+      filter(label == type)
+  }
+  
+  # most negative
+  neg <- sent_sentiment |> 
+    arrange(compound) |> 
+    head()
+  
+  return(neg)
+  
+} 
+
+# Write function to plot daily sentiment ---------------------------------------
+plot_sentiment_sent <- function(
+    df, 
+    type = "all", 
+    group = "newspaper", 
+    start_date = as_date("2023-09-07"), 
+    end_date = as_date("2023-11-07")
+    ) {
+  
+  # check input
+  if (!type %in% c("all", "palestine/gaza", "israel", "hamas")) return("Invalid type. Please choose from 'all', 'palestine/gaza', 'israel', 'hamas'")
+
+  # filter based on type, if needed
+  if (type != "all") {
+    df <- df |> 
+      filter(label == type)
+  }
+
+  # calculate daily sentiment by news source
+  daily_sentiment <- df |> 
+    group_by(newspaper, date) |>
+    summarise(score = mean(compound, na.rm = TRUE)) |>
+    pivot_wider(names_from = newspaper, values_from = score)
+  
+  # create df of days
+  days <- data.frame(
+    date = seq(start_date, end_date, 1)
+  )
+  
+  # reshape data
+  daily_sentiment <- daily_sentiment |> 
+    pivot_longer(cols = -date, names_to = "newspaper", values_to = "score") |> 
+    #group_by(newspaper) |> 
+    #mutate(score_7day_avg = data.table::frollmean(score, 7)) |> 
+    arrange(date) 
+  
+  # plot sentiment over time
+  out <- daily_sentiment |> 
+    #filter(!newspaper %in% c("Die Welt (English)", "South China Morning Post", "The Straits Times (Singapore)", "The Times of India (TOI)")) |> 
+    ggplot(aes(date, color = .data[[group]])) + 
+    geom_hline(yintercept = 0, color = "darkgrey") +
+    geom_vline(xintercept = as_date("2023-10-07"), color = "red", linetype = "longdash") + 
+    geom_point(aes(y = score), alpha = .9) + 
+    geom_smooth(aes(y = score), se = FALSE, method = "lm") + 
+    annotate("text", x = as_date("2023-10-09"), y = .75, angle = 90, label = "Oct 7th", color = "red") +
+    scale_x_date(
+      limits = c(start_date, end_date),
+      date_breaks = "1 week", 
+      date_labels = "%d %b",
+      date_minor_breaks = "1 week"
+      ) +
+    scale_y_continuous(breaks = seq(-1, 1, 0.2), minor_breaks = NULL) +
+    scale_color_brewer(
+      palette = "Set2",
+      labels = c("Al Jazeera", "Die Welt", "South China Morning Post", "The Guardian", 
+                 "The New York Times", "The Straits Times", "The Times of India")
+    ) +
+    labs(
+      title = "Sentiment by News Source",
+      subtitle = case_when(
+        type == "all" ~ "News coverage of 2023 Israel-Hamas War",
+        type == "israel" ~ "News coverage mentioning Israel",
+        type == "palestine/gaza" ~ "News coverage mentioning Palestine and/or Gaza",
+        type == "hamas" ~ "News coverage mentioning Hamas"
+        ),
+      caption = "Source: LexisNexis",
+      #caption = str_wrap(str_c("Sources: ", str_c(head(unique(df$newspaper), -1), collapse = ", "), ", and ", tail(unique(df$newspaper), 1)), 100),
+      x = NULL,
+      y = "Sentiment Score",
+      color = "News Source"
+    ) + 
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, vjust = 0.5)
+    )
+  
+  return(out)
+  
 }
 
-# most negative
-neg <- sent_sentiment |> 
-  arrange(compound) |> 
-  head()
+# Sentiment analysis, overall --------------------------------------------------
+# most positive sentences, overall
+pos_sent_all <- most_pos_sent(sent_sentiment, "all")
+head(pos_sent_all)
 
-for (i in rownames(neg)) {
-  print(neg[i, "text"])
-  print(neg[i, "compound"])
+for (i in rownames(pos_sent_all)) {
+  print(pos_sent_all[i, "text"])
+  print(pos_sent_all[i, "compound"])
 }
 
-# add metadata: news source, date, label
-sent_sentiment$newspaper <- corpus_labeled$newspaper
-sent_sentiment$date <- as_date(corpus_labeled$date) 
-sent_sentiment$label <- corpus_labeled$label
+# most negative sentences, overall 
+neg_sent_all <- most_neg_sent(sent_sentiment, "all")
+head(neg_sent_all)
 
-# calculate daily sentiment by news source
-daily_sentiment <- sent_sentiment %>% 
-  group_by(newspaper, date) %>%
-  summarise(score = mean(compound)) %>%
-  pivot_wider(names_from = newspaper, values_from = score)
-
-# create df of days
-days <- data.frame(
-  date = seq(as_date("2023-09-07"), as_date("2023-11-07"), 1)
-)
-
-# reshape data
-daily_sentiment <- daily_sentiment %>% 
-  pivot_longer(cols = -date, names_to = "newspaper", values_to = "score") |> 
-  #group_by(newspaper) |> 
-  arrange(date) 
-#mutate(score_7day_avg = data.table::frollmean(score, 7))
-
-# plot
-daily_sentiment |> 
-  filter(!newspaper %in% c("Die Welt (English)", "South China Morning Post", "The Straits Times (Singapore)")) |> 
-  ggplot(aes(date, color = newspaper)) + 
-  geom_point(aes(y = score)) + 
-  geom_smooth(aes(y = score), se = FALSE) + 
-  geom_hline(yintercept = 0, color = "grey", linetype = "longdash") +
-  geom_vline(xintercept = as_date("2023-10-07"), color = "red") + 
-  annotate("text", x = as_date("2023-10-09"), y = .65, angle = 90, label = "Oct 7th", color = "red") +
-  scale_x_date(limits = c(as_date("2023-09-07"), as_date("2023-11-07"))) +
-  labs(
-    title = "Avg. sentiment by media outlet",
-    subtitle = "News coverage of Israel-Hamas War",
-    caption = "Sources: Al Jazeera, Die Welt, The Guardian, The New York Times, South China Morning Post",
-    x = NULL,
-    y = "Sentiment Score",
-    color = "Media Outlet"
-  ) + 
-  theme_minimal()
-
-# end time 
-tictoc::toc()
-
-# Sentiment analysis by media outlet (coverage of Israel) ----------------------
-# start time 
-tictoc::tic()
-
-# select label
-corpus_isr <- corpus_labeled |> 
-  filter(label == "israel")
-
-# calculate valence of sentences
-sentiments <- vader_df(corpus_isr$sentence)
-
-# combine sentence with valence scores
-sent_sentiment <- cbind(
-  text = corpus_isr$sentence, # text
-  sentiments |> select(-text, -word_scores) # metadata
-)
-
-# most positive
-pos <- sent_sentiment |> 
-  arrange(desc(compound)) |> 
-  head()
-
-for (i in rownames(pos)) {
-  print(pos[i, "text"])
-  print(pos[i, "compound"])
+for (i in rownames(neg_sent_all)) {
+  print(neg_sent_all[i, "text"])
+  print(neg_sent_all[i, "compound"])
 }
 
-# most negative
-neg <- sent_sentiment |> 
-  arrange(compound) |> 
-  head()
+# plot sentiment over time, overall
+p <- plot_sentiment_sent(sent_sentiment, type = "all", group = "newspaper")
+p
 
-for (i in rownames(neg)) {
-  print(neg[i, "text"])
-  print(neg[i, "compound"])
+# save plot
+ggsave(filename = here("output/sentiment_sent_all.png"))
+
+# Sentiment analysis, Israel ---------------------------------------------------
+# most positive sentences, Israel
+pos_sent_isr <- most_pos_sent(sent_sentiment, "israel")
+head(pos_sent_isr)
+
+for (i in rownames(pos_sent_isr)) {
+  print(pos_sent_isr[i, "text"])
+  print(pos_sent_isr[i, "compound"])
 }
 
-# add metadata: news source, date, label
-sent_sentiment$newspaper <- corpus_isr$newspaper
-sent_sentiment$date <- as_date(corpus_isr$date) 
-sent_sentiment$label <- corpus_isr$label
+# most negative sentences, Israel 
+neg_sent_isr <- most_neg_sent(sent_sentiment, "israel")
+head(neg_sent_isr)
 
-# calculate daily sentiment by news source
-daily_sentiment <- sent_sentiment %>% 
-  group_by(newspaper, date) %>%
-  summarise(score = mean(compound)) %>%
-  pivot_wider(names_from = newspaper, values_from = score)
-
-# create df of days
-days <- data.frame(
-  date = seq(as_date("2023-09-07"), as_date("2023-11-07"), 1)
-)
-
-# reshape data
-daily_sentiment <- daily_sentiment %>% 
-  pivot_longer(cols = -date, names_to = "newspaper", values_to = "score") |> 
-  #group_by(newspaper) |> 
-  arrange(date) 
-#mutate(score_7day_avg = data.table::frollmean(score, 7))
-
-# plot
-daily_sentiment |> 
-  filter(!newspaper %in% c("Die Welt (English)", "South China Morning Post", "The Straits Times (Singapore)")) |> 
-  ggplot(aes(date, color = newspaper)) + 
-  geom_point(aes(y = score)) + 
-  geom_smooth(aes(y = score), se = FALSE) + 
-  geom_hline(yintercept = 0, color = "grey", linetype = "longdash") +
-  geom_vline(xintercept = as_date("2023-10-07"), color = "red") + 
-  annotate("text", x = as_date("2023-10-09"), y = .65, angle = 90, label = "Oct 7th", color = "red") +
-  scale_x_date(limits = c(as_date("2023-09-07"), as_date("2023-11-07"))) +
-  labs(
-    title = "Avg. sentiment by media outlet",
-    subtitle = "News coverage of Israel-Hamas War",
-    caption = "Sources: Al Jazeera, Die Welt, The Guardian, The New York Times, South China Morning Post",
-    x = NULL,
-    y = "Sentiment Score",
-    color = "Media Outlet"
-  ) + 
-  theme_minimal()
-
-# end time 
-tictoc::toc()
-
-# Sentiment analysis by media outlet (coverage of Palestine/Gaza) --------------
-# start time 
-tictoc::tic()
-
-# select label
-corpus_pal <- corpus_labeled |> 
-  filter(label == "palestine/gaza")
-
-# calculate valence of sentences
-sentiments <- vader_df(corpus_pal$sentence)
-
-# combine sentence with valence scores
-sent_sentiment <- cbind(
-  text = corpus_pal$sentence, # text
-  sentiments |> select(-text, -word_scores) # metadata
-)
-
-# most positive
-pos <- sent_sentiment |> 
-  arrange(desc(compound)) |> 
-  head()
-
-for (i in rownames(pos)) {
-  print(pos[i, "text"])
-  print(pos[i, "compound"])
+for (i in rownames(neg_sent_isr)) {
+  print(neg_sent_isr[i, "text"])
+  print(neg_sent_isr[i, "compound"])
 }
 
-# most negative
-neg <- sent_sentiment |> 
-  arrange(compound) |> 
-  head()
+# plot sentiment over time, Israel
+p <- plot_sentiment_sent(sent_sentiment, type = "israel", group = "newspaper")
+p
 
-for (i in rownames(neg)) {
-  print(neg[i, "text"])
-  print(neg[i, "compound"])
+# save plot
+ggsave(filename = here("output/sentiment_sent_israel.png"))
+
+
+# Sentiment analysis, Palestine/Gaza -------------------------------------------
+# most positive sentences, Palestine/Gaza
+pos_sent_pal <- most_pos_sent(sent_sentiment, "palestine/gaza")
+head(pos_sent_pal)
+
+for (i in rownames(pos_sent_pal)) {
+  print(pos_sent_pal[i, "text"])
+  print(pos_sent_pal[i, "compound"])
 }
 
-# add metadata: news source, date, label
-sent_sentiment$newspaper <- corpus_pal$newspaper
-sent_sentiment$date <- as_date(corpus_pal$date) 
-sent_sentiment$label <- corpus_pal$label
+# most negative sentences, Palestine/Gaza 
+neg_sent_pal <- most_neg_sent(sent_sentiment, "palestine/gaza")
+head(neg_sent_pal)
 
-# calculate daily sentiment by news source
-daily_sentiment <- sent_sentiment %>% 
-  group_by(newspaper, date) %>%
-  summarise(score = mean(compound)) %>%
-  pivot_wider(names_from = newspaper, values_from = score)
+for (i in rownames(neg_sent_pal)) {
+  print(neg_sent_pal[i, "text"])
+  print(neg_sent_pal[i, "compound"])
+}
 
-# create df of days
-days <- data.frame(
-  date = seq(as_date("2023-09-07"), as_date("2023-11-07"), 1)
-)
+# plot sentiment over time, Palestine/Gaza
+p <- plot_sentiment_sent(sent_sentiment, type = "palestine/gaza", group = "newspaper")
+p
 
-# reshape data
-daily_sentiment <- daily_sentiment %>% 
-  pivot_longer(cols = -date, names_to = "newspaper", values_to = "score") |> 
-  #group_by(newspaper) |> 
-  arrange(date) 
-#mutate(score_7day_avg = data.table::frollmean(score, 7))
+# save plot
+ggsave(filename = here("output/sentiment_sent_palestine.png"))
 
-# plot
-daily_sentiment |> 
-  filter(!newspaper %in% c("Die Welt (English)", "South China Morning Post", "The Straits Times (Singapore)")) |> 
-  ggplot(aes(date, color = newspaper)) + 
-  geom_point(aes(y = score)) + 
-  geom_smooth(aes(y = score), se = FALSE) + 
-  geom_hline(yintercept = 0, color = "grey", linetype = "longdash") +
-  geom_vline(xintercept = as_date("2023-10-07"), color = "red") + 
-  annotate("text", x = as_date("2023-10-09"), y = .65, angle = 90, label = "Oct 7th", color = "red") +
-  scale_x_date(limits = c(as_date("2023-09-07"), as_date("2023-11-07"))) +
-  labs(
-    title = "Avg. sentiment by media outlet",
-    subtitle = "News coverage of Israel-Hamas War",
-    caption = "Sources: Al Jazeera, Die Welt, The Guardian, The New York Times, South China Morning Post",
-    x = NULL,
-    y = "Sentiment Score",
-    color = "Media Outlet"
-  ) + 
-  theme_minimal()
 
-# end time 
-tictoc::toc()
+# Sentiment analysis, Hamas ----------------------------------------------------
+# most positive sentences, Hamas
+pos_sent_hms <- most_pos_sent(sent_sentiment, "hamas")
+head(pos_sent_hms)
+
+for (i in rownames(pos_sent_hms)) {
+  print(pos_sent_hms[i, "text"])
+  print(pos_sent_hms[i, "compound"])
+}
+
+# most negative sentences, Hamas
+neg_sent_hms <- most_neg_sent(sent_sentiment, "hamas")
+head(neg_sent_hms)
+
+for (i in rownames(neg_sent_hms)) {
+  print(neg_sent_hms[i, "text"])
+  print(neg_sent_hms[i, "compound"])
+}
+
+# plot sentiment over time, Hamas
+p <- plot_sentiment_sent(sent_sentiment, type = "hamas", group = "newspaper")
+p
+
+# save plot
+ggsave(filename = here("output/sentiment_sent_hamas.png"))
