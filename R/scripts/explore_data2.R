@@ -18,6 +18,10 @@
 # Version date:	  01/12/2023
 #=======================================================================================================
 
+## To Do
+## Plot article length over time and by newspaper
+## concatenate title, highlight and where byline or section includes title do that?
+## filter sentences into those on Gaza and those on Israel
 
 # ===========================================================================
 #   1) Settings on the loading and processing of data
@@ -56,6 +60,7 @@ setwd(wd)
 
 corpus_sent <- data.table(read.csv(paste0(wd, vintage_path, "corpus_sent_2023-12-02", ".csv")))
 corpus <- data.table(read.csv(paste0(wd, vintage_path, "corpus_2023-12-02", ".csv")))
+corpus_filtered <- data.table(read.csv(paste0(wd, vintage_path, "corpus_filtered_2023-12-02", ".csv")))
 
 
 # ===========================================================================
@@ -116,3 +121,43 @@ ggplot(article_counts, aes(x = date, y = N, color = newspaper)) +
   annotate("text", x = as.Date("2023-10-15"), y = max(article_counts$N), label = "Start of Conflict", vjust = -0.5, hjust = 0.5, color = "black")# Add red vertical line
 
 ggsave(paste0(wd, output_path, "articles_over_time_newspaper",".png"), width = 10, height = 8)
+
+
+# Distribution of article length
+
+# Create a boxplot of article length distribution for each newspaper
+ggplot(corpus_filtered, aes(x = newspaper, y = length, fill = newspaper)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 3000, color = "red", linetype = "dashed") +
+  labs(title = "Article Length Distribution by Newspaper",
+       x = "Newspaper", y = "Article Length") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  guides(fill = FALSE)+
+  annotate("text", x = 1.25, y = 3120, label = "Cutoff at 3000 words", color = "red")
+
+ggsave(paste0(wd, output_path, "boxplot_length",".png"), width = 10, height = 8)
+
+
+# Length over time
+
+corpus_filtered$date <- as.Date(corpus_filtered$date)
+corpus_filtered <- corpus_filtered[date>as.Date("2023-09-01"),]
+corpus_filtered[, mean_length := mean(length, na.rm=T ), by = date]
+
+# Create a scatterplot of article length over time with a moving average and confidence bands
+ggplot(corpus_filtered, aes(x = date, y = mean_length)) +
+  geom_point(color = "blue") +  # Scatterplot points
+  geom_smooth(method = "lm", formula = y ~ poly(x, 10), color = "red", fill = "pink", alpha = 0.3, se = TRUE) +  # Polynomial regression line with confidence bands  labs(title = "Article Length Over Time",
+  labs(title = "Article Length Over Time",     
+       x = "Date", y = "Article Length") +
+  scale_x_date(date_labels = "%d %b %Y", date_breaks = "1 week", expand = c(0.02, 0.02)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  geom_vline(xintercept = as.Date("2023-10-07"), color = "black", linetype = "dashed")+
+  annotate("text", x = as.Date("2023-10-14"), y = max(corpus_filtered$mean_length)-50, label = "Start of Conflict", vjust = -0.5, hjust = 0.5, color = "black")# Add red vertical line
+
+
+
+ggsave(paste0(wd, output_path, "length_overtime",".png"), width = 10, height = 8)
+

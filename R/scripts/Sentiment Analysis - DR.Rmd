@@ -1,0 +1,277 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-12-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(radarchart)
+library(readr)
+library(dplyr)
+library(hrbrthemes)
+library(ggplot2)
+library(vader)
+library(tidytext)
+```
+
+## NRC = Sentiments in Words
+
+```{r}
+nrc <- get_sentiments("nrc")
+```
+
+```{r}
+corpus <- read_csv("~/Documents/MDS Final Year/5th Semester/04_Text as Data/Assignments/Final Assignment/data/corpus_sent_2023-12-02.csv")
+
+```
+
+## Classify Sentences
+
+```{r}
+
+# Assuming df is your corpus data frame
+df <- corpus %>%
+  mutate(
+    key = case_when(
+      grepl("Palestin|Gaza", sentence, ignore.case = TRUE) & !grepl("Israel|Hamas", sentence, ignore.case = TRUE) ~ "Palestine",
+      grepl("Israel", sentence, ignore.case = TRUE) & !grepl("Palestin|Hamas|Gaza", sentence, ignore.case = TRUE) ~ "Israel",
+      grepl("Hamas", sentence, ignore.case = TRUE) & !grepl("Palestin|Israel|Gaza", sentence, ignore.case = TRUE) ~ "Hamas",
+      grepl("Palestin|Gaza", sentence, ignore.case = TRUE) & grepl("Israel", sentence, ignore.case = TRUE) & !grepl("Hamas|Hammas", sentence, ignore.case = TRUE) ~ "Mix",
+      grepl("Palestin|Gaza", sentence, ignore.case = TRUE) & grepl("Hamas", sentence, ignore.case = TRUE) & !grepl("Israel", sentence, ignore.case = TRUE) ~ "Mix",
+      grepl("Israel", sentence, ignore.case = TRUE) & grepl("Hamas", sentence, ignore.case = TRUE) & !grepl("Palestin|Gaza", sentence, ignore.case = TRUE) ~ "Mix",
+      TRUE ~ NA_character_  # Default value if none of the conditions are met
+    )
+  )
+
+```
+
+
+```{r}
+library(tidyverse)
+
+df %>%
+  group_by(newspaper, key) %>%
+  summarize(count = n()) %>%
+  pivot_wider(names_from = key, values_from = count, values_fill = 0) 
+
+```
+
+```{r}
+library(vader)
+
+# Vader doesn't take into account causality 
+get_vader("Israel attacked Palestine")
+get_vader("Palestine attacked Israel")
+
+# The problem persists even when there is a single subject
+get_vader("Palestinians were killed")
+get_vader("Palestinians were killing")
+
+```
+# Filtered subset of our labelled corpus
+
+```{r}
+df2 <- df %>% 
+  select(newspaper, key, sentence) %>% 
+  filter(key == "Palestine"| key == "Israel"|key == "Hamas")
+
+```
+
+```{r}
+# calculate valence of sentences
+sentiments <- vader_df(df2$sentence)
+```
+
+# combine sentences, sentiment scores, and metadata
+
+```{r}
+df_2 <- cbind(
+  text = df2$sentence, # text
+  sentiments |> select(-text, -word_scores), # sentiment scores
+  newspaper = df2$newspaper, # media oulet
+  key = df2$key # label (e.g., palestine/gaza, israel)
+)
+```
+
+```{r}
+df_2 <- df_2 %>% 
+  select(newspaper, key, text, compound) %>% 
+  rename(sentence = text)
+```
+
+
+
+## Creating a Box Plot of Sentiment Polarity for each Label
+
+
+```{r}
+# Box plot
+ggplot(df_2, aes(x = newspaper, y = compound, fill = key)) +
+  geom_boxplot(col = "darkred") +
+  scale_fill_manual(values = c("Israel" = "#0000FF", "Palestine" = "#F00B42", "Hamas" = "#FFD700"), name = "Key") +  
+  theme_minimal() +
+  ggtitle("Newspaper Polarity by Key Labels") +
+  labs(x = "Newspapers", y = "Sentiment Score") +  # Set axis titles
+  theme(axis.title.x = element_text(size = 20),  # Adjust the size of x-axis title
+        axis.title.y = element_text(size = 20)) + # Adjust the size of y-axis title
+  theme(axis.text.x = element_text(size = 10),  # Adjust the size of x-axis labels
+        axis.text.y = element_text(size = 15))  # Adjust the size of y-axis labels
+
+```
+# Tokenize the words and add a count
+
+```{r}
+scores <- df_2 %>% 
+  mutate(text = sentence) %>%
+  unnest_tokens(word, text, token = "words") %>% 
+  select(!compound) %>%
+  group_by(newspaper, key, sentence, word) %>%
+  summarise(count = n()) %>% 
+  rename(term = word) %>% 
+  inner_join(nrc, by = c("term" = "word"))
+
+```
+
+
+```{r}
+Al_Jazeera_English_scores <- 
+  scores %>% 
+  ungroup() %>% 
+  filter(newspaper == "Al Jazeera English") %>% 
+  filter(!grepl("positive|negative", sentiment)) %>% 
+  # Count by book and sentiment
+  count(key, sentiment) %>% 
+  # Pivot book, using n as values
+  pivot_wider(names_from = key, values_from = n, values_fill = 0) 
+
+AJ_plot <- chartJSRadar(Al_Jazeera_English_scores)
+
+AJ_plot
+
+```
+
+
+Die Welt (English)				
+
+```{r}
+
+DW_scores <- 
+  scores %>% 
+  ungroup() %>% 
+  filter(newspaper == "Die Welt (English)") %>% 
+  filter(!grepl("positive|negative", sentiment)) %>% 
+  # Count by book and sentiment
+  count(key, sentiment) %>% 
+  # Pivot book, using n as values
+  pivot_wider(names_from = key, values_from = n, values_fill = 0) 
+
+DW_plot <- chartJSRadar(DW_scores)
+
+DW_plot
+
+```
+
+South China Morning Post				
+```{r}
+SC_scores <- 
+  scores %>% 
+  ungroup() %>% 
+  filter(newspaper == "South China Morning Post") %>% 
+  filter(!grepl("positive|negative", sentiment)) %>% 
+  # Count by book and sentiment
+  count(key, sentiment) %>% 
+  # Pivot book, using n as values
+  pivot_wider(names_from = key, values_from = n, values_fill = 0) 
+
+
+SC_plot <- chartJSRadar(SC_scores)
+
+SC_plot
+
+```
+				
+The Guardian (London)		
+```{r}
+TGL_scores <- 
+  scores %>% 
+  ungroup() %>% 
+  filter(newspaper == "The Guardian (London)") %>% 
+  filter(!grepl("positive|negative", sentiment)) %>% 
+  # Count by book and sentiment
+  count(key, sentiment) %>% 
+  # Pivot book, using n as values
+  pivot_wider(names_from = key, values_from = n, values_fill = 0) 
+
+
+TGL_plot <- chartJSRadar(TGL_scores)
+
+TGL_plot
+```
+
+The New York Times			
+```{r}
+NYT_scores <- 
+  scores %>% 
+  ungroup() %>% 
+  filter(newspaper == "The New York Times") %>% 
+  filter(!grepl("positive|negative", sentiment)) %>% 
+  # Count by book and sentiment
+  count(key, sentiment) %>% 
+  # Pivot book, using n as values
+  pivot_wider(names_from = key, values_from = n, values_fill = 0) 
+
+
+NYT_plot <- chartJSRadar(DW_scores)
+
+NYT_plot
+```
+
+The Straits Times (Singapore)				
+```{r}
+TST_scores <- 
+  scores %>% 
+  ungroup() %>% 
+  filter(newspaper == "The Straits Times (Singapore)") %>% 
+  filter(!grepl("positive|negative", sentiment)) %>% 
+  # Count by book and sentiment
+  count(key, sentiment) %>% 
+  # Pivot book, using n as values
+  pivot_wider(names_from = key, values_from = n, values_fill = 0) 
+
+
+TST_plot <- chartJSRadar(TST_scores)
+
+TST_plot
+```
+
+The Times of India (TOI)
+```{r}
+TOI_scores <- 
+  scores %>% 
+  ungroup() %>% 
+  filter(newspaper == "The Times of India (TOI)") %>% 
+  filter(!grepl("positive|negative", sentiment)) %>% 
+  # Count by book and sentiment
+  count(key, sentiment) %>% 
+  # Pivot book, using n as values
+  pivot_wider(names_from = key, values_from = n, values_fill = 0) 
+
+TOI_plot <- chartJSRadar(TOI_scores)
+
+
+
+TOI_plot
+```
+
+
+
+
+
+
+
+
