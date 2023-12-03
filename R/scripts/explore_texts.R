@@ -48,6 +48,44 @@ corpus |>
   mutate(load_date = mdy(load_date)) |>
   filter(date < as_date("2023-09-01") | load_date < as_date("2023-09-01")) # TODO: exclude articles published before 1 Sep 2023
 
+# pre-Oct 7 vs post-Oct 7
+corpus |> 
+  filter(!is.na(date)) |> 
+  mutate(
+    date_type = ifelse(date < as_date("2023-10-07"), "pre_oct7", "post_oct7")
+  ) |> 
+  janitor::tabyl(
+    newspaper, date_type
+  ) |> 
+  janitor::adorn_totals() |> 
+  janitor::adorn_percentages() |> 
+  arrange(desc(pre_oct7)) |> 
+  arrange(newspaper == "Total") |> 
+  janitor::adorn_pct_formatting(digits = 0) |>
+  janitor::adorn_ns() |> 
+  relocate(pre_oct7, .before = "post_oct7") |> 
+  gt::gt() |> 
+  gt::tab_header(
+    title = "Articles by Publication Date"
+  ) |> 
+  gt::cols_label(
+    newspaper = "News Source",
+    pre_oct7 = "Pre-October 7th",
+    post_oct7 = "Post-October 7th"
+  ) |> 
+  gt::tab_style(
+    locations = gt::cells_body(
+      columns = everything(),
+      rows = newspaper == "Total"
+    ),
+    style = gt::cell_borders(
+      sides = c("t", "b"),
+      weight = gt::px(3),
+      gt::cell_text(weight = "bold")
+    )
+  )
+  
+
 # plot date
 corpus |> # TODO: remove articles from before 1 Sep 2023 and after ???
   ggplot(aes(x = date, color = newspaper)) + 

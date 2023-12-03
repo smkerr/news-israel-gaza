@@ -75,7 +75,7 @@ corpus_tidy <- corpus |>
   filter(n() == 1) |> # remove duplicates
   ungroup() |> 
   mutate(sentence = str_to_lower(sentence)) |> 
-  select(newspaper, date, sentence) |> 
+  select(newspaper, date, sentence, title) |> 
   arrange(date)
 
 # assign Palestine/Gaza or Israel label
@@ -360,3 +360,160 @@ p
 
 # save plot
 ggsave(filename = here("output/sentiment_sent_hamas.png"))
+
+# Sentiment analysis: NRC method -----------------------------------------------
+# load NRC lexicon
+lex <- read_tsv(
+  here("data/lex/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt"), 
+  col_names = c("word", "sentiment", "value")
+) |> 
+  filter(!sentiment %in% c("negative", "positive"))
+
+# types of sentiment
+unique(lex$sentiment)
+
+sent_sentiments <- dfmat |> 
+  tidy() |> # DFM to tidy format
+  inner_join(lex, by = c("term" = "word"), relationship = "many-to-many") |> # combine DFM with lexicon
+  mutate(value = count * value) |> # calculate sentiment scores
+  group_by(document, sentiment) |>
+  summarise(value = sum(value, na.rm = TRUE)) |> 
+  ungroup()
+
+# combine with metadata
+sent_sentiments <- sent_sentiments |> 
+  inner_join(
+    dfmat@docvars |> select(docname_, newspaper, date, label, sentence),
+    by = c("document" = "docname_")
+  )
+
+# Write function to plot daily sentiment ---------------------------------------
+plot_nrc_sentiment_sent <- function(
+    df, 
+    type = "all", 
+    group = "newspaper", 
+    start_date = as_date("2023-09-07"), 
+    end_date = as_date("2023-11-07")
+    ) {
+  
+  # check input
+  if (!type %in% c("all", "palestine/gaza", "israel", "hamas")) return("Invalid type. Please choose from 'all', 'palestine/gaza', 'israel', 'hamas'")
+  
+  # filter by label, if needed
+  if (type != "all") {
+    df <- df |> 
+      filter(label == type)
+  }
+  
+  # calculate daily averages
+  daily_sentiments <- df |> 
+    group_by(newspaper, date, sentiment) |> 
+    summarize(value = mean(value, na.rm = TRUE)) |> 
+    ungroup() |> 
+    mutate(sentiment = str_to_title(sentiment))
+  
+  # determine plot order
+  sentiment_order <- daily_sentiments |>
+    group_by(date_type = ifelse(date < as_date("2023-10-07"), "pre_oct7", "post_oct7"), sentiment) |>
+    summarize(avg_val = mean(value, na.rm = TRUE)) |>
+    ungroup() |>
+    pivot_wider(names_from = date_type, values_from = avg_val) |>
+    mutate(val_diff = post_oct7 - pre_oct7) |>
+    arrange(desc(val_diff)) |>
+    pull(sentiment)
+  
+  # plot sentiment over time
+  out <- daily_sentiments |> 
+    mutate(sentiment = factor(sentiment, levels = sentiment_order)) |> 
+    ggplot(aes(date, group = date < as_date("2023-10-07"))) + # color = .data[[group]])) + 
+    geom_hline(yintercept = 0, color = "black") +
+    geom_vline(xintercept = as_date("2023-10-07"), color = "red", linetype = "longdash") + 
+    geom_point(aes(y = value), alpha = .5) + 
+    geom_smooth(aes(y = value), se = FALSE, method = "lm") + 
+    #annotate("text", x = as_date("2023-10-12"), y = 1.75, angle = 90, label = "Oct 7th", color = "red") +
+    facet_wrap(~sentiment, ncol = 2) +
+    scale_x_date(
+      limits = c(start_date, end_date),
+      date_breaks = "1 week", 
+      date_labels = "%d %b",
+      date_minor_breaks = "1 week"
+    ) +
+    #scale_y_continuous(breaks = seq(0, 2.5, 0.5), minor_breaks = NULL) +
+    scale_y_continuous(minor_breaks = NULL) +
+    scale_color_brewer(
+      palette = "Set2",
+      labels = c("Al Jazeera", "Die Welt", "South China Morning Post", "The Guardian", 
+                 "The New York Times", "The Straits Times", "The Times of India")
+    ) +
+    labs(
+      title = "Sentence-level Sentiment Scores",
+      subtitle = case_when(
+        type == "all" ~ "News coverage of 2023 Israel-Hamas War",
+        type == "israel" ~ "News coverage mentioning Israel",
+        type == "palestine/gaza" ~ "News coverage mentioning Palestine and/or Gaza",
+        type == "hamas" ~ "News coverage mentioning Hamas"
+      ),
+      caption = "Source: LexisNexis",
+      x = NULL,
+      y = "Sentiment Score",
+      color = "News Source"
+    ) + 
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, vjust = 0.5)
+    )
+  
+  return(out)
+  
+}
+
+# plot sentiments over time, overall 
+plot_nrc_sentiment_sent(sent_sentiments)
+# save plot 
+ggsave(filename = here("output/sentiment_sent_nrc_all.png"))
+
+# plot sentiments over time, Palestine/Gaza 
+plot_nrc_sentiment_sent(sent_sentiments, type = "palestine/gaza")
+# save plot 
+ggsave(filename = here("output/sentiment_sent_nrc_palestine.png"))
+
+# plot sentiments over time, Israel 
+plot_nrc_sentiment_sent(sent_sentiments, type = "israel")
+# save plot 
+ggsave(filename = here("output/sentiment_sent_nrc_israel.png"))
+
+# plot sentiments over time, Israel 
+plot_nrc_sentiment_sent(sent_sentiments, type = "hamas")
+# save plot 
+ggsave(filename = here("output/sentiment_sent_nrc_hamas.png"))
+
+# Write function to find the top articles by sentiment -------------------------
+top_sentiment_text <- function(df, emotion) {
+  
+  if (!emotion %in% unique(lex$sentiment)) return("Enter a valid sentiment: 'anger', 'anticipation', 'disgust', 'fear', 'joy', 'sadness', 'surprise', 'trust'")
+  
+  # top articles by sentiment
+  top_df <- df |> 
+    filter(sentiment == emotion) |> 
+    select(newspaper, sentence, value) |> 
+    arrange(desc(value)) 
+  
+  return(top_df)
+  
+} 
+
+sent_sentiments_labeled <- corpus_labeled |> 
+  group_by(title) |> 
+  mutate(document = paste0("text", n())) |> 
+  inner_join(sent_sentiments, relationship = "many-to-many") |> 
+  ungroup()
+
+# top articles by sentiment
+top_sentiment_text(sent_sentiments_labeled, emotion = "anger") |> head()
+top_sentiment_text(sent_sentiments_labeled, emotion = "anticipation") |> head()
+top_sentiment_text(sent_sentiments_labeled, emotion = "disgust") |> head()
+top_sentiment_text(sent_sentiments_labeled, emotion = "fear") |> head()
+top_sentiment_text(sent_sentiments_labeled, emotion = "joy") |> head()
+top_sentiment_text(sent_sentiments_labeled, emotion = "sadness") |> head()
+top_sentiment_text(sent_sentiments_labeled, emotion = "surprise") |> head()
+top_sentiment_text(sent_sentiments_labeled, emotion = "trust") |> head()

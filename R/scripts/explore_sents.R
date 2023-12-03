@@ -52,6 +52,8 @@ corpus |>
   mutate(load_date = mdy(load_date)) |>
   filter(date < as_date("2023-09-01") | load_date < as_date("2023-09-01")) # TODO: exclude articles published before 1 Sep 2023
 
+
+
 # plot date
 corpus |> # TODO: remove articles from before 1 Sep 2023 and after ???
   ggplot(aes(x = date, color = newspaper)) + 
