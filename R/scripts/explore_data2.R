@@ -19,9 +19,8 @@
 #=======================================================================================================
 
 ## To Do
-## Plot article length over time and by newspaper
 ## concatenate title, highlight and where byline or section includes title do that?
-## filter sentences into those on Gaza and those on Israel
+
 
 # ===========================================================================
 #   1) Settings on the loading and processing of data
@@ -72,12 +71,15 @@ article_counts <- corpus[, .(count = .N), by = newspaper]
 
 
 # Create a bar chart using ggplot2 and add labels with actual counts
-ggplot(article_counts, aes(x = reorder(newspaper, -count), y = count)) +
+ggplot(article_counts, aes(x = reorder(newspaper, count), y = count)) +
   geom_bar(stat = "identity", fill = "blue") +
-  geom_text(aes(label = count), vjust = -0.5, size = 3) +  # Add labels
+  geom_text(aes(label = count), hjust = -0.2, size = 3) +  # Add labels
   labs(title = "Frequency of Newspaper Articles by Newspaper",
        x = "Newspaper", y = "Frequency") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  coord_flip()
+ 
 
 ggsave(paste0(wd, output_path, "articles_frequency",".png"), width = 10, height = 8)
 
@@ -126,7 +128,7 @@ ggsave(paste0(wd, output_path, "articles_over_time_newspaper",".png"), width = 1
 # Distribution of article length
 
 # Create a boxplot of article length distribution for each newspaper
-ggplot(corpus_filtered, aes(x = newspaper, y = length, fill = newspaper)) +
+ggplot(corpus_filtered, aes(x = reorder(newspaper, length), y = length, fill = newspaper)) +
   geom_boxplot() +
   geom_hline(yintercept = 3000, color = "red", linetype = "dashed") +
   labs(title = "Article Length Distribution by Newspaper",
@@ -134,7 +136,8 @@ ggplot(corpus_filtered, aes(x = newspaper, y = length, fill = newspaper)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   guides(fill = FALSE)+
-  annotate("text", x = 1.25, y = 3120, label = "Cutoff at 3000 words", color = "red")
+  annotate("text", x = 1.25, y = 3120, label = "Cutoff at 3000 words", color = "red")+
+  coord_flip()
 
 ggsave(paste0(wd, output_path, "boxplot_length",".png"), width = 10, height = 8)
 
@@ -146,17 +149,39 @@ corpus_filtered <- corpus_filtered[date>as.Date("2023-09-01"),]
 corpus_filtered[, mean_length := mean(length, na.rm=T ), by = date]
 
 # Create a scatterplot of article length over time with a moving average and confidence bands
-ggplot(corpus_filtered, aes(x = date, y = mean_length)) +
-  geom_point(color = "blue") +  # Scatterplot points
-  geom_smooth(method = "lm", formula = y ~ poly(x, 10), color = "red", fill = "pink", alpha = 0.3, se = TRUE) +  # Polynomial regression line with confidence bands  labs(title = "Article Length Over Time",
-  labs(title = "Article Length Over Time",     
-       x = "Date", y = "Article Length") +
+# ggplot(corpus_filtered, aes(x = date, y = mean_length)) +
+#   geom_point(color = "blue") +  # Scatterplot points
+#   geom_smooth(method = "lm", formula = y ~ poly(x, 10), color = "red", fill = "pink", alpha = 0.3, se = TRUE) +  # Polynomial regression line with confidence bands  labs(title = "Article Length Over Time",
+#   labs(title = "Article Length Over Time",     
+#        x = "Date", y = "Article Length") +
+#   scale_x_date(date_labels = "%d %b %Y", date_breaks = "1 week", expand = c(0.02, 0.02)) +
+#   theme_minimal() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+#   geom_vline(xintercept = as.Date("2023-10-07"), color = "black", linetype = "dashed")+
+#   annotate("text", x = as.Date("2023-10-14"), y = max(corpus_filtered$mean_length)-50, label = "Start of Conflict", vjust = -0.5, hjust = 0.5, color = "black")# Add red vertical line
+# 
+
+# Split the data into two subsets
+before_break <- corpus_filtered %>% 
+  filter(date < as.Date("2023-10-07"))
+after_break <- corpus_filtered %>% 
+  filter(date >= as.Date("2023-10-07"))
+
+# Fit linear models
+lm_before <- lm(mean_length ~ date, data = before_break)
+lm_after <- lm(mean_length ~ date, data = after_break)
+
+# Plot
+ggplot() +
+  geom_point(data = corpus_filtered, aes(x = date, y = mean_length), color = "blue") +
+  geom_line(data = before_break, aes(x = date, y = predict(lm_before, newdata = before_break)), color = "red") +
+  geom_line(data = after_break, aes(x = date, y = predict(lm_after, newdata = after_break)), color = "red") +
+  labs(title = "Article Length Over Time", x = "Date", y = "Article Length") +
   scale_x_date(date_labels = "%d %b %Y", date_breaks = "1 week", expand = c(0.02, 0.02)) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  geom_vline(xintercept = as.Date("2023-10-07"), color = "black", linetype = "dashed")+
-  annotate("text", x = as.Date("2023-10-14"), y = max(corpus_filtered$mean_length)-50, label = "Start of Conflict", vjust = -0.5, hjust = 0.5, color = "black")# Add red vertical line
-
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_vline(xintercept = as.Date("2023-10-07"), color = "black", linetype = "dashed") +
+  annotate("text", x = as.Date("2023-10-14"), y = max(corpus_filtered$mean_length) - 50, label = "Start of Conflict", vjust = -0.5, hjust = 0.5, color = "black")
 
 
 ggsave(paste0(wd, output_path, "length_overtime",".png"), width = 10, height = 8)
