@@ -19,7 +19,6 @@
 #=======================================================================================================
 
 ##### TO DO
-# convert words into characters in length for SCM and TST?
 # filter articles by block-time updated-timeUpdated
 
 
