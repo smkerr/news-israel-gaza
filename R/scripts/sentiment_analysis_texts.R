@@ -56,14 +56,11 @@ dfmat <- corpus_tidy |>
 docvars(dfmat) |> head()
 
 # Prepare data for sentiment analysis ------------------------------------------
-# start time 
-tictoc::tic()
-
 # calculate valence of articles
-sentiments <- vader_df(corpus_tidy$body)
+sentiments <- vader_df(corpus_tidy$body) # ~90 min
 
-# end time 
-tictoc::toc()
+# save for later
+saveRDS(sentiments, here("data/sentiments_articles.rds"))
 
 # combine articles, sentiment scores, and metadata
 text_sentiment <- cbind(
@@ -163,9 +160,41 @@ plot_sentiment_text <- function(
 }
 
 
-# Sentiment analysis -----------------------------------------------------------
+# Sentiment analysis: Vader method ---------------------------------------------
+# most positive articles
+pos_text <- most_pos_text(text_sentiment)
+pos_text
+
+for (i in rownames(pos_text)) {
+  print(pos_text[i, "title"])
+  print(pos_text[i, "compound"])
+}
+
+pos_text |> 
+  gt::gt()
+
+# most negative articles
+neg_text <- most_neg_text(text_sentiment)
+neg_text
+
+for (i in rownames(neg_text)) {
+  print(neg_text[i, "title"])
+  print(neg_text[i, "compound"])
+}
+
 # plot article sentiment over time 
-plot_sentiment_text(text_sentiment)
+p <- plot_sentiment_text(text_sentiment)
+p
+
+# save plot
+ggsave(filename = here("output/sentiment_articles.png"))
+
+# Sentiment analysis: NRC method -----------------------------------------------
+# load NRC lexicon
+lex <- get_sentiments("nrc")
+
+# compare NRC sources
+lex2 <- read_tsv(here("lex/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt"))
 
 # Validation -------------------------------------------------------------------
 # TODO: random sample for human validation

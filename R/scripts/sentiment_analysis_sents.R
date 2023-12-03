@@ -258,7 +258,7 @@ plot_sentiment_sent <- function(
 # Sentiment analysis, overall --------------------------------------------------
 # most positive sentences, overall
 pos_sent_all <- most_pos_sent(sent_sentiment, "all")
-head(pos_sent_all)
+pos_sent_all
 
 for (i in rownames(pos_sent_all)) {
   print(pos_sent_all[i, "text"])
@@ -267,7 +267,7 @@ for (i in rownames(pos_sent_all)) {
 
 # most negative sentences, overall 
 neg_sent_all <- most_neg_sent(sent_sentiment, "all")
-head(neg_sent_all)
+neg_sent_all
 
 for (i in rownames(neg_sent_all)) {
   print(neg_sent_all[i, "text"])
@@ -284,7 +284,7 @@ ggsave(filename = here("output/sentiment_sent_all.png"))
 # Sentiment analysis, Israel ---------------------------------------------------
 # most positive sentences, Israel
 pos_sent_isr <- most_pos_sent(sent_sentiment, "israel")
-head(pos_sent_isr)
+pos_sent_isr
 
 for (i in rownames(pos_sent_isr)) {
   print(pos_sent_isr[i, "text"])
@@ -293,7 +293,7 @@ for (i in rownames(pos_sent_isr)) {
 
 # most negative sentences, Israel 
 neg_sent_isr <- most_neg_sent(sent_sentiment, "israel")
-head(neg_sent_isr)
+neg_sent_isr
 
 for (i in rownames(neg_sent_isr)) {
   print(neg_sent_isr[i, "text"])
@@ -311,7 +311,7 @@ ggsave(filename = here("output/sentiment_sent_israel.png"))
 # Sentiment analysis, Palestine/Gaza -------------------------------------------
 # most positive sentences, Palestine/Gaza
 pos_sent_pal <- most_pos_sent(sent_sentiment, "palestine/gaza")
-head(pos_sent_pal)
+pos_sent_pal
 
 for (i in rownames(pos_sent_pal)) {
   print(pos_sent_pal[i, "text"])
@@ -320,7 +320,7 @@ for (i in rownames(pos_sent_pal)) {
 
 # most negative sentences, Palestine/Gaza 
 neg_sent_pal <- most_neg_sent(sent_sentiment, "palestine/gaza")
-head(neg_sent_pal)
+neg_sent_pal
 
 for (i in rownames(neg_sent_pal)) {
   print(neg_sent_pal[i, "text"])
@@ -338,7 +338,7 @@ ggsave(filename = here("output/sentiment_sent_palestine.png"))
 # Sentiment analysis, Hamas ----------------------------------------------------
 # most positive sentences, Hamas
 pos_sent_hms <- most_pos_sent(sent_sentiment, "hamas")
-head(pos_sent_hms)
+pos_sent_hms
 
 for (i in rownames(pos_sent_hms)) {
   print(pos_sent_hms[i, "text"])
@@ -347,7 +347,7 @@ for (i in rownames(pos_sent_hms)) {
 
 # most negative sentences, Hamas
 neg_sent_hms <- most_neg_sent(sent_sentiment, "hamas")
-head(neg_sent_hms)
+neg_sent_hms
 
 for (i in rownames(neg_sent_hms)) {
   print(neg_sent_hms[i, "text"])
