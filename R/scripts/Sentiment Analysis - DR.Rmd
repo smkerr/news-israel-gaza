@@ -155,6 +155,20 @@ AJ_plot
 
 ```
 
+```{r with_janitor}
+Al_Jazeera_English_scores <- 
+  scores %>% 
+  ungroup() %>% 
+  filter(newspaper == "Al Jazeera English") %>% 
+  filter(!grepl("positive|negative", sentiment)) %>% 
+  janitor::tabyl(sentiment, key) |> # count sentiment by groups
+  janitor::adorn_percentages(denominator = "col") # calculate percentages
+
+AJ_plot <- chartJSRadar(Al_Jazeera_English_scores)
+
+AJ_plot
+
+```
 
 Die Welt (English)				
 
