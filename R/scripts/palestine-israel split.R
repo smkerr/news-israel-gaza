@@ -154,22 +154,39 @@ tfidf_codes <- all_words %>%
   # Calculate TF-IDF
   bind_tf_idf(word2, key, n)
 
-
-plot <- tfidf_codes[!is.na(key),] %>%
+tfidf_codes <- tfidf_codes[!is.na(key),] %>%
   group_by(key) %>%
   arrange(desc(n)) %>%  # Sort by tf_idf in descending order
   slice(1:15) %>%  # Select the top 10 observations
-  ungroup() %>%
-  ggplot(aes(x = reorder(word2, n), y = n, fill = as.factor(key))) +
+  ungroup()
+
+tfidf_codes <- as.data.table(tfidf_codes[,c("key", "word2", "n")])
+tfidf_codes[,Total := sum(n), by = "key"]
+tfidf_codes[,share := n/Total]
+
+
+plot <-ggplot(tfidf_codes[!is.na(key),], aes(x = reorder(word2, share), y = share, fill = as.factor(key))) +
   geom_col(show.legend = FALSE) +
   labs(x = NULL, y = "Count", title = paste("Count of words")) +
   facet_wrap(~key, ncol = 2, scales = "free_y") +
   coord_flip()+
   theme_minimal()
 
+# plot <- tfidf_codes[!is.na(key),] %>%
+#   group_by(key) %>%
+#   arrange(desc(n)) %>%  # Sort by tf_idf in descending order
+#   slice(1:15) %>%  # Select the top 10 observations
+#   ungroup() %>%
+#   ggplot(aes(x = reorder(word2, n), y = n, fill = as.factor(key))) +
+#   geom_col(show.legend = FALSE) +
+#   labs(x = NULL, y = "Count", title = paste("Count of words")) +
+#   facet_wrap(~key, ncol = 2, scales = "free_y") +
+#   coord_flip()+
+#   theme_minimal()
+
 # Save the plot
 print(plot)
-ggsave(filename = paste0(wd, output_path, "WordCount", ".png"), plot = plot, width = 10, height = 6)
+ggsave(filename = paste0(wd, output_path, "WordCount", ".png"), plot = plot, width = 14, height = 6)
 
 
 key <- unique(tfidf_codes$key)
